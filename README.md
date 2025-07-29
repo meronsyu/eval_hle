@@ -11,17 +11,16 @@
 [こちら](https://docs.google.com/document/d/16KKkFM8Sbqx0wgcCY4kBKR6Kik01T-jn892e_y67vbM/edit?tab=t.0)
 
 ## 評価の実行方法
-### 実行前・二つのタブを開いてください
-sshでログインノード→scancelで自動投入ジョブキャンセル、からのsrun
+### 実行前
+GPU数を設定
 ```python
 bash ../shareP12/scancel_hatakeyama.sh gpu84 gpu85 && srun --job-name=evaluate_phi4 --partition P12 --nodes=1 --nodelist osk-gpu[84] --gpus-per-node=1 --time=12:00:00 --pty bash -i
 ```
 ```python
 conda activate llmbench
 ```
-### vllm起動側
-eval_hle/conf/config.yaml
 
+モデル名を評価したいモデルに変更
 ```python
 export NCCL_SOCKET_IFNAME=enp25s0np0
 export NVTE_FUSED_ATTN=0
@@ -35,26 +34,12 @@ unset ROCR_VISIBLE_DEVICES
 ulimit -v unlimited
 ulimit -m unlimited
 ```
+eval_hle/confのconfig.yamlを自分が評価したいモデルに変更
 ```python
 model: microsoft/Phi-4-reasoning-plus
 ```
-モデル名を評価したいモデルに変更
 
-### 評価実行側
-
-```python
-export NCCL_SOCKET_IFNAME=enp25s0np0
-export NVTE_FUSED_ATTN=0
-#CUDA_VISIBLE_DEVICESでトレーニングに使用するGPUの数を制御します。
-#例えば、単一GPUの場合は以下のように設定します：
-#export CUDA_VISIBLE_DEVICES=0
-export CUDA_VISIBLE_DEVICES=0,1,2,3
-#※AMD製のGPUではないため、ROCR_VISIBLE_DEVICES を指定しないようにしてください。指定するとエラーになります。
-unset ROCR_VISIBLE_DEVICES
-
-ulimit -v unlimited
-ulimit -m unlimited
-```
+eval_hle/confのconfig.yamlを自分が評価したいカテゴリに変更
 ```python
 category_filter:
   - "Biology/Medicine"
@@ -64,10 +49,24 @@ category_filter: null
 ```
 カテゴリを複数選ぶかnullを記述
 
+### 実行時
+モデルが立ち上がるまで待機。nohup.outの中身を見ながら待つ。
+```python
+nohup ./hle_script.sh > vllm.log 2>&1 &
+```
+立ち上がったモデルを元に評価
+```python
+nohup ./hle_prediction.sh > prediction.log 2>&1 &
+```
+
 ## 注意点
+慣れるまではエラーが出ると思うので、shellスクリプトを実行するときは&を消して、ログを確認するのをお勧めします。
+gpu数は、モデルごとにmulti head数と語彙数でassertエラーが起きる可能性があるので、基本２の倍数がお勧めです。
+https://www.notion.so/239e14b94af5807f88d0df0189e3cc98 にmulti head数の見方が載っています。
 
-ベースコードのhle_script.shをうまく実行できなかったので、vllmの起動とタスクの回答、評価を分けています。
-
+chmod +x hle_prediction.sh
+chmod +x hle_script.sh
+を忘れずに
 ## Contributors
 
 ```
