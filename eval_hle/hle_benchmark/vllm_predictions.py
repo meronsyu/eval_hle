@@ -104,7 +104,15 @@ def main(args: Config):
 
     assert args.num_workers > 1, "num_workers must be 2 or greater"
     dataset = load_dataset(args.dataset, split="test")
+    # 画像フィルタ
     dataset = dataset.filter(lambda item: item['image'] == "")
+
+    # カテゴリをフィルタ
+    if args.category_filter:
+        category_filters_lower = [c.lower() for c in args.category_filter]
+        dataset = dataset.filter(lambda item: item["category"].lower() in category_filters_lower)
+
+    # dataset = dataset.select(range(3))
     dataset = dataset.to_dict()
 
     # convert to list of json for async parallelism
@@ -114,8 +122,16 @@ def main(args: Config):
     if args.max_samples:
         questions = questions[:args.max_samples]
     
-    output_filepath = f"predictions/hle_{os.path.basename(args.model)}.json"   
+    output_filepath = f"predictions/hle_{os.path.basename(args.model)}.json"  
 
+    output_dir = os.path.dirname(output_filepath)
+    if not os.path.exists(output_dir):
+        os.makedirs(output_dir) 
+
+    # もしディレクトリがない場合は作成
+    output_dir = os.path.dirname(output_filepath)
+    if not os.path.exists(output_dir):
+        os.makedirs(output_dir) 
 
     # load only questions without responses
     if os.path.exists(output_filepath):
