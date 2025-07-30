@@ -81,7 +81,8 @@ async def attempt_question(args, question):
     return question["id"], content, tokens
 
 
-async def attempt_all(args, questions):
+# 回答が10問ごとに保存
+async def attempt_all(args, questions, predictions, output_filepath):
     async def bound_func(question):
         async with semaphore:
             content = await attempt_question(args, question)
@@ -90,7 +91,30 @@ async def attempt_all(args, questions):
     semaphore = asyncio.Semaphore(args.num_workers)
     async with semaphore:
         tasks = [bound_func(q) for q in questions]
-        results = await tqdm_asyncio.gather(*tasks)
+        results = []
+        completed_count = 0
+        
+        # Process results as they complete and save every 10 items
+        for result in tqdm_asyncio.as_completed(tasks):
+            result_data = await result
+            results.append(result_data)
+            
+            if result_data is not None:
+                unique_id, response, usage = result_data
+                predictions[unique_id] = {
+                    "model": args.model,
+                    "response": response,
+                    "usage": usage
+                }
+                completed_count += 1
+                print(f"Processed question ID: {unique_id}. Total completed: {completed_count}")
+                
+                # Save every 10 completed items
+                if completed_count % 10 == 0:
+                    with open(output_filepath, "w") as f:
+                        json.dump(predictions, f, indent=4)
+                    print(f"Saved progress: {completed_count} items completed")
+    
     return results
 
 def main(args: Config):
@@ -124,10 +148,6 @@ def main(args: Config):
     
     output_filepath = f"predictions/hle_{os.path.basename(args.model)}.json"  
 
-    output_dir = os.path.dirname(output_filepath)
-    if not os.path.exists(output_dir):
-        os.makedirs(output_dir) 
-
     # もしディレクトリがない場合は作成
     output_dir = os.path.dirname(output_filepath)
     if not os.path.exists(output_dir):
@@ -141,19 +161,9 @@ def main(args: Config):
     else:
         predictions = {}
 
-    results = asyncio.run(attempt_all(args, questions))
+    results = asyncio.run(attempt_all(args, questions, predictions, output_filepath))
 
-    # You can rerun this script multiple times if there are failed API calls
-    for result in results:
-        if result is None: # API call failed
-            continue
-        unique_id, response, usage = result
-        predictions[unique_id] = {
-            "model": args.model,
-            "response": response,
-            "usage": usage
-        }
-
-    # cache responses
+    # Final save to ensure all data is persisted
     with open(output_filepath, "w") as f:
         json.dump(predictions, f, indent=4)
+    print(f"Final save completed: {len([r for r in results if r is not None])} total items processed")
