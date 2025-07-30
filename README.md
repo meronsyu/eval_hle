@@ -12,7 +12,7 @@ eval_hle/hle_script.shのOpenai_keyとhuggingfaceのトークンを自分で埋�
 ### 実行前
 GPU数を設定
 ```python
-bash ../shareP12/scancel_hatakeyama.sh gpu84 gpu85 && srun --job-name=evaluate_phi4 --partition P12 --nodes=1 --nodelist osk-gpu[84] --gpus-per-node=1 --time=12:00:00 --pty bash -i
+bash ../shareP12/scancel_hatakeyama.sh gpu84 gpu85 gpu86 && srun --job-name=evaluate --partition P12 --nodes=1 --nodelist osk-gpu[86] --gpus-per-node=1 --time=12:00:00 --pty bash -i
 ```
 ```python
 conda activate llmbench
@@ -46,6 +46,20 @@ category_filter:
 category_filter: null
 ```
 カテゴリを複数選ぶかnullを記述
+
+eval_hleのhle_script.shを自分が評価したいモデル、それに適したGPU数GPU数に変更
+```python
+#--- GPU 監視 -------------------------------------------------------
+nvidia-smi -i 0,1,2,3,4 -l 3 > nvidia-smi.log &
+pid_nvsmi=$!
+
+#--- vLLM 起動（2GPU）----------------------------------------------
+# tensor-parallel-sizeについてはmulti headsを割り切れる数に指定する必要あり
+vllm serve Qwen/QwQ-32B \
+  --tensor-parallel-size 4 \
+  --reasoning-parser deepseek_r1 \
+```
+
 
 ### 実行時
 モデルが立ち上がるまで待機。nohup.outの中身を見ながら待つ。
