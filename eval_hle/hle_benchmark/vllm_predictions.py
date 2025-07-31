@@ -28,6 +28,7 @@ from datasets import load_dataset
 from openai import AsyncOpenAI
 from tqdm.asyncio import tqdm_asyncio
 from hle_benchmark._configs import Config
+import datetime # datetimeモジュールをインポート
 
 
 SYSTEM_EXACT_ANSWER = "Your response should be in the following format:\nExplanation: {your explanation for your final answer}\nExact Answer: {your succinct, final answer}\nConfidence: {your confidence score between 0% and 100% for your answer}"
@@ -142,11 +143,28 @@ def main(args: Config):
     # convert to list of json for async parallelism
     questions = [dict(zip(dataset.keys(), values)) for values in zip(*dataset.values())]
     
+    # 同じ問題は解かないためのフィルタリング機能
+    # 設定したpredictionファイルについて被りがないように問題をフィルタ
+    if args.duplicate_filter:
+        # load only questions without responses
+        if os.path.exists(args.duplicate_file):
+            with open(args.duplicate_file, "r") as f:
+                predictions = json.load(f)
+            questions = [q for q in questions if q["id"] not in predictions]
+        else:
+            print("ファイル名や位置が間違っている")
+
     # If max_samples is set, limit the number of questions
     if args.max_samples:
         questions = questions[:args.max_samples]
+
     
-    output_filepath = f"predictions/hle_{os.path.basename(args.model)}.json"  
+    timestamp_str = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+
+    # ファイル名にモデル名とタイムスタンプを組み込む
+    # 例: predictions/hle_qwen3-32b_20250731_023309.json
+    # 複数の実行で衝突が起きないようにするため
+    output_filepath = f"predictions/hle_{os.path.basename(args.model)}_{timestamp_str}.json"
 
     # もしディレクトリがない場合は作成
     output_dir = os.path.dirname(output_filepath)

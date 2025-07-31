@@ -5,28 +5,46 @@ provider: vllm # [vllm]
 base_url: http://localhost:8000/v1
 
 model: microsoft/Phi-4-reasoning-plus
-# model: Qwen/Qwen3-32B
+# model: Qwen/QwQ-32B
 max_completion_tokens: 100000
 reasoning: true
 
 # sample with multimodal is 2500, so text-only sample is about 2400
 num_workers: 2500
-max_samples: 2400
+max_samples: 2500
 
 judge: o3-mini-2025-01-31
 
 # 記載されたカテゴリのみ評価
 # 一例
 # category_filter:
-#   - "Math"
+#     - "Math"
+#     - "Physics"
+#     - "Humanities/Social Science"
+#     - "Engineering"
+#     - "Chemistry"
+#     - "Biology/Medicine"
+#     - "Computer Science/AI"
+#     - "Other"
 
-category_filter:
-  - "Biology/Medicine"
-  - "Computer Science/AI"
-  - "Other"
-  - "Humanities/Social Science"
-  - "Physics"
-  - "Chemistry"
+# category_filter:
+#    - "Math"
+
+# 前解き終わらなかった回答を解かせたいときに使う
+duplicate_filter: True
+
+# 回答のidを見ることでどの問題が解き終わらなかったのかを見る
+# 前解き終わらなかった回答を解かせたいときに使う
+duplicate_file: ./predictions/hle_Phi-4-reasoning-plus.json
 
 
-# category_filter: null
+category_filter: null
+
+# category_filter:
+#     - "Physics"
+#     - "Humanities/Social Science"
+#     - "Engineering"
+#     - "Chemistry"
+#     - "Biology/Medicine"
+#     - "Computer Science/AI"
+#     - "Other"

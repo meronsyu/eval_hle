@@ -2,7 +2,7 @@
 
 評価コードです。現在、HLEタスクのカテゴリを選択して評価できるように修正しました。
 時間内に評価が終わらなくても、回答が作成されるように修正しました。
-(07/31)openrouterを使って評価できるように修正中です。
+解き終わっていないタスクのみを解けるように修正しました。
 
 ## 注意
 環境構築前提です。
@@ -13,7 +13,7 @@ eval_hle/hle_script.shのOpenai_keyとhuggingfaceのトークンを自分で埋�
 ### 実行前
 GPU数を設定
 ```python
-bash ../shareP12/scancel_hatakeyama.sh gpu84 gpu85 gpu86 && srun --job-name=evaluate --partition P12 --nodes=1 --nodelist osk-gpu[86] --gpus-per-node=1 --time=12:00:00 --pty bash -i
+bash ../shareP12/scancel_hatakeyama.sh gpu84 gpu85 gpu86 && srun --job-name=evaluate --partition P12 --nodes=1 --nodelist osk-gpu[86] --gpus-per-node=4 --ntasks=16 --time=12:00:00 --pty bash -i
 ```
 ```python
 conda activate llmbench
@@ -60,6 +60,19 @@ vllm serve Qwen/QwQ-32B \
   --tensor-parallel-size 4 \
   --reasoning-parser deepseek_r1 \
 ```
+解き終わっていないを問題のみを回答をしたいときはconfの引数を以下のように設定して。
+これを行わない場合は、duplicate_filterをFalseにすればいい。
+```python
+# 前解き終わらなかった回答を解かせたいときに使う
+duplicate_filter: True
+
+# 回答のidを見ることでどの問題が解き終わらなかったのかを見る
+# 前解き終わらなかった回答を解かせたいときに使う
+duplicate_file: ./predictions/hle_Phi-4-reasoning-plus.json
+
+
+category_filter: null
+```
 
 
 ### 実行時
@@ -71,6 +84,11 @@ nohup ./hle_script.sh > vllm.log 2>&1 &
 ```python
 nohup ./hle_prediction.sh > prediction.log 2>&1 &
 ```
+eval_hle/confのconfig.yamlを自分が評価したいにモデルに変更
+```python
+OPENAI_API_KEY=xxx python judge.py
+```
+
 
 ## 注意点
 慣れるまではエラーが出ると思うので、shellスクリプトを実行するときは&を消して、ログを確認するのをお勧めします。

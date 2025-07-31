@@ -34,12 +34,15 @@ from tqdm.asyncio import tqdm_asyncio
 from datasets import load_dataset
 from datetime import datetime
 
+# 非同期処理
 client = AsyncOpenAI(
     timeout=300.0,
     max_retries=1,
     api_key=os.environ.get("OPENAI_API_KEY"),
 )
 
+
+# 回答、reasoning、cofidenceの妥当性を図る
 JUDGE_PROMPT = """Judge whether the following [response] to [question] is correct or not based on the precise and unambiguous [correct_answer] below.
 
 [question]: {question}
@@ -59,6 +62,7 @@ correct: Answer 'yes' if extracted_final_answer matches the [correct_answer] giv
 
 confidence: The extracted confidence score between 0|%| and 100|%| from [response]. Put 100 if there is no confidence score available."""
 
+# pydanticによる型設定
 class ExtractedAnswer(BaseModel):
     extracted_final_answer: str
     reasoning: str
@@ -66,7 +70,8 @@ class ExtractedAnswer(BaseModel):
     confidence: int
     strict: Literal[True] # 100% reliability
 
-    
+
+# LLMが作成した駄文から評価結果をjudgeモデルを用いて出力    
 async def extract_answer(args, question, correct_answer, response):
     prompt = JUDGE_PROMPT.format(question=question, correct_answer=correct_answer, response=response)
     try:
@@ -89,7 +94,8 @@ async def extract_answer(args, question, correct_answer, response):
     except Exception as e: # very, very rare
         print("Error:", e)
         return None
-        
+
+# 評価済みでない場合、評価を行う         
 async def add_judge_response(args, question, predictions):
     unique_id = question["id"]
     prediction = copy.deepcopy(predictions[unique_id]) # not in-place
@@ -100,6 +106,8 @@ async def add_judge_response(args, question, predictions):
         return unique_id, prediction
     
     response = prediction["response"]
+    
+    # judgeモデルに回答評価
     content = await extract_answer(args, question_text, correct_answer, response)
 
     if content is not None:
@@ -108,6 +116,8 @@ async def add_judge_response(args, question, predictions):
     else:
         return None, None
 
+# openaiに一括で投げる並列処理
+# 並列で何個投げるのか
 async def judge_all_responses(args, questions, predictions):
     async def bound_func(question):
         async with semaphore:
@@ -120,8 +130,18 @@ async def judge_all_responses(args, questions, predictions):
         results = await tqdm_asyncio.gather(*tasks)
     return results
 
+# エラーの計算方法を決定するパラメータについて、
+# エラーの計算方法
+## '2' (デフォルト): L2ノルム（二乗平均平方根誤差）を使用。大きな誤差に敏感
+## '1': L1ノルム（平均絶対誤差）を使用。
+## 'infty' / 'infinity' / 'max': 最大誤差を使用
+# 各「ビン」（区間）の目標となるサンプルサイズ。自信度をソートし、このサイズでビンに分割。
 # source: https://github.com/hendrycks/outlier-exposure/blob/master/utils/calibration_tools.py
-def calib_err(confidence, correct, p='2', beta=100): 
+
+# todo：binごとのキャリブレーションを求めたい。
+# 自信度ごとのキャリブレーションの値がわかる
+def calib_err(confidence, correct, p='2', beta=50): 
+    # 
     if len(confidence) < beta:
         return 0.0
     # beta is target bin size
@@ -155,6 +175,7 @@ def calib_err(confidence, correct, p='2', beta=100):
 
     return cerr
 
+# 
 def dump_metrics(args, predictions, total_questions, all_questions):
     correct = []
     confidence = []
@@ -195,6 +216,17 @@ def dump_metrics(args, predictions, total_questions, all_questions):
     print("*** Metrics ***")
     print(f"Accuracy: {accuracy}% +/- {confidence_half_width}% | n = {n}")
     print(f"Calibration Error: {calibration_error}")
+
+    print("\n*** Accuracy Per Category ***") # ここから追加
+    for category, results_list in correct_by_category.items():
+        num_correct = sum(results_list) # Trueの数を数える
+        num_total = len(results_list)   # そのカテゴリの総質問数
+
+        if num_total > 0:
+            print(f"- {category}: {num_correct} / {num_total} ({round(num_correct / num_total * 100, 2)}%)")
+        else:
+            print(f"- {category}: No questions evaluated in this category.")
+    print("*****************************") # ここまで追加
 
     results = []
     for k,v in predictions.items():
@@ -246,6 +278,12 @@ def main(args):
 
     total_questions = len(all_questions)
 
+    # output_filepath のディレクトリ部分を取得
+    output_dir = os.path.dirname(output_filepath)
+    # ディレクトリが存在しない場合に作成
+    os.makedirs(output_dir, exist_ok=True) 
+
+    # todo:今回カテゴリごとにばらばらに予測を行ったから貼り付ける必要あり。
     with open(f"predictions/hle_{os.path.basename(args.model)}.json", "r") as f:
         predictions = json.load(f)
     
