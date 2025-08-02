@@ -4,8 +4,11 @@ provider: vllm # [vllm]
 
 base_url: http://localhost:8000/v1
 
-model: microsoft/Phi-4-reasoning-plus
-# model: Qwen/QwQ-32B
+# model: Qwen/Qwen3-32B
+# model: microsoft/Phi-4-reasoning-plus
+model: Qwen/QwQ-32B
+# model: deepseek-ai/DeepSeek-R1-Distill-Qwen-32B
+# model: Qwen/Qwen3-32B
 max_completion_tokens: 100000
 reasoning: true
 
@@ -35,9 +38,8 @@ duplicate_filter: True
 
 # 回答のidを見ることでどの問題が解き終わらなかったのかを見る
 # 前解き終わらなかった回答を解かせたいときに使う
-duplicate_file: ./predictions/hle_Phi-4-reasoning-plus.json
-
-
+# duplicate_file: ./predictions/hle_QwQ-32B.json
+duplicate_file: ./predictions/hle_QwQ-32B.json
 category_filter: null
 
 # category_filter:

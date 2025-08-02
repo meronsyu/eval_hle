@@ -152,7 +152,7 @@ def main(args: Config):
                 predictions = json.load(f)
             questions = [q for q in questions if q["id"] not in predictions]
         else:
-            print("ファイル名や位置が間違っている")
+            print("args.duplicate_fileの設定が間違っている")
 
     # If max_samples is set, limit the number of questions
     if args.max_samples:
